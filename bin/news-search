@@ -1,0 +1,161 @@
+#! /bin/env perl
+# -*- perl -*-
+
+# @Author: Tong SUN, (c)2002-2008, all right reserved
+# @Version: $Date: 2008/11/01 14:26:22 $ $Revision: 1.6 $
+# @HomeURL: http://xpt.sourceforge.net/
+
+# @CREDIT:
+# First draft in script from
+# http://www.geocities.com/SiliconValley/Horizon/9144/cdlwb007.html
+# By Sujit Pal, Concord, California, USA
+
+=head1 NAME
+
+news-search - command line newsgroup scanner.
+
+=head1 SYNOPSIS
+
+  news-search max_p ngname [ngname...] [param=value...]
+
+=head1 DESCRIPTION
+
+This program scans for newsgroup articles from the command
+line. The following arguments are supported.
+
+=over 4
+
+=item *
+
+max_p, maxinum number of posts to search (not return).
+
+=item *
+
+ngname, newsgroup pattern to search. May have more than one newsgroups to
+search at once.
+
+=item *
+
+Subject=pattern, look in the Subject: line.
+
+=item *
+
+From=pattern, look for author in the From: line.
+
+=item *
+
+Body=pattern, look for pattern in article body.
+
+=back
+
+The pattern can be any Perl regular expressions.
+
+The above pattern match keyword can also be prefixed with 'No', e.g.,
+
+    NoSubject=pattern
+
+to ignore messages if pattern found in the Subject: line.
+
+=head1 EXAMPLES
+
+  news-search 30 tor.housing Subject='rent|sublet|room|bdr|house|apt|apartment|condo' NoSubject='sale|FS'
+
+This search the default 'news' nntp server. Or, to specify an alternative one:
+
+  export NNTPSERVER=news.easysw.com
+  news-search 80 cups.general cups.bugs Body='die|break|broke'
+
+=head1 AUTHOR
+
+ @Author:  SUN, Tong <suntong at cpan.org>
+ @HomeURL: http://xpt.sourceforge.net/
+
+=head1 COPYRIGHT
+
+Copyright (c) 2003-2008 Tong SUN. All rights reserved.
+
+=cut
+
+# ############################################################## &ps ###
+# ................................................... Program starts ...
+
+
+# ============================================================== &us ===
+# ............................................................. Uses ...
+
+# -- global modules
+#require Data::Dumper;
+
+use News::Search;
+
+
+# ============================================================== &cs ===
+# ................................................. Constant setting ...
+my $VERSION = sprintf("%d.%02d", q$Revision: 1.6 $ =~ /(\d+)\.(\d+)/);
+
+
+# ============================================================== &gv ===
+# .................................................. Global Varibles ...
+
+my $verbose = 1;
+
+my %args;
+
+# ============================================================== &sb ===
+# .................................................... Script begins ...
+
+
+#
+# Handle command line arguments
+#
+die "\nUsage: news-search max_p ngname [ngname...] [name=value...]\n\n".
+    "Example:\n\n".
+    "  news-search 30 tor.housing Subject='rent|sublet|room|bdr|house|apt|apartment|condo' NoSubject='sale|FS'\n"
+    if $#ARGV == -1;
+    
+
+# ============================================================ &pclp ===
+# .................................. process command line parameters ...
+
+my $max_p = shift @ARGV;
+
+foreach (@ARGV) {
+    if(/=/){
+	# key/value pair
+	my ($name, $value) = split(/=/);
+	$name = lc $name;
+	$args{$name} = $value;
+    } else {
+	# group name
+	$ngname = $_;
+	if (index($ngname, "\*") > -1) {
+	    # have wildcard (*) in group name. FIXME: NOK.
+	    # May have wildcard ('*') in group name, eg, '*linux*'.
+	    $nntplist = $nntp->list() || die "Cannot list newsgroups";
+	    $ngname =~ s/\*/.*/g;
+	    foreach (sort(keys(%$nntplist))) {
+		if (/$ngname/) {
+		    push(@newsgroups, $_);
+		}
+	    }
+	} else {
+	    push(@newsgroups, $ngname);
+	}
+    }
+}
+
+my $ns = News::Search->new(\@newsgroups, \%args, $max_p);
+
+print STDERR "Searching in newsgroups: @newsgroups...\n\n"
+    if $verbose;
+
+my %newsarticles = $ns->SearchNewsgroups;
+#print STDERR "\n==>> \n" . Data::Dumper->Dump([\%newsarticles]) . "==<< \n";
+
+# Dump found news postings
+foreach my $article (values %newsarticles) {
+    print "==== ". $article->{"SUBJECT"}. "\n\n";
+    print join("\n",@{$article->{"HEADER"}}). "\n\n";
+    print $article->{"BODY"}. "\n";
+}
+print "\n\n";
