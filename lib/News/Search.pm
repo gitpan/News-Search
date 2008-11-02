@@ -3,6 +3,36 @@ package News::Search;
 use warnings;
 use strict;
 
+# @Author: Tong SUN, (c)2001-2008, all right reserved
+# @Version: $Date: 2008/10/31 16:07:34 $ $Revision:  $
+# @HomeURL: http://xpt.sourceforge.net/
+
+# {{{ LICENSE: 
+
+# 
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose and without fee is hereby granted, provided
+# that the above copyright notices appear in all copies and that both those
+# copyright notices and this permission notice appear in supporting
+# documentation, and that the names of author not be used in advertising or
+# publicity pertaining to distribution of the software without specific,
+# written prior permission.  Tong Sun makes no representations about the
+# suitability of this software for any purpose.  It is provided "as is"
+# without express or implied warranty.
+#
+# TONG SUN DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING ALL
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT SHALL ADOBE
+# SYSTEMS INCORPORATED AND DIGITAL EQUIPMENT CORPORATION BE LIABLE FOR ANY
+# SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER
+# RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF
+# CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+# CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# 
+
+# }}} 
+
+# {{{ POD, Intro:
+
 =head1 NAME
 
 News::Search - Usenet news searching toolkit
@@ -30,6 +60,8 @@ watch for specific news groups for specific criteria and mail you
 reports according to the interval you set.
 
 =cut
+
+# }}}
 
 use Carp;
 use Net::NNTP;
