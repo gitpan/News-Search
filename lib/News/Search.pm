@@ -4,7 +4,7 @@ use warnings;
 use strict;
 
 # @Author: Tong SUN, (c)2001-2008, all right reserved
-# @Version: $Date: 2008/10/31 16:07:34 $ $Revision:  $
+# @Version: $Date: 2008/11/04 17:19:30 $ $Revision: 1.15 $
 # @HomeURL: http://xpt.sourceforge.net/
 
 # {{{ LICENSE: 
@@ -41,10 +41,9 @@ News::Search - Usenet news searching toolkit
 
   use News::Search;
 
-  my @newsgroups = ( "cups.general", "cups.bugs" );
-  my %args = ( subject => 'die|break|broke' );
+  my $ns = News::Search->new();
+  $ns->search_for(\@ARGV);
 
-  my $ns = News::Search->new(\@newsgroups, \%args);
   my %newsarticles = $ns->SearchNewsgroups;
 
 =head1 DESCRIPTION
@@ -55,112 +54,195 @@ It can be used to search local news groups that google doesn't cover.
 Or, even for news groups that are covered by google, it can give you
 all the hits in one file, in the format that you prescribed.
 
-You can also adapt the L<news-search> and put it into the cron job to
-watch for specific news groups for specific criteria and mail you
-reports according to the interval you set.
+You can also use the provided L<news-search> in cron to watch specific
+news groups for specific criteria and mail you reports according to the
+interval you set.
 
 =cut
 
 # }}}
 
+# {{{ Global Declaration:
+
+# ============================================================== &us ===
+# ............................................................. Uses ...
+
+# -- global modules
 use Carp;
 use Net::NNTP;
 
-require Exporter;
+use base qw(Class::Accessor::Fast);
 
-our @ISA = qw(Exporter);
+# ============================================================== &cs ===
+# ................................................. Constant setting ...
+#
 
-# Items to export into callers namespace by default. Note: do not export
-# names by default without a very good reason. Use EXPORT_OK instead.
-# Do not simply export all your public functions/methods/constants.
+our @EXPORT = (  ); # may even omit this line
+our $VERSION = sprintf("%d.%02d", q$Revision: 1.15 $ =~ /(\d+)\.(\d+)/);
 
-# This allows declaration	use News::Search ':all';
-# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
-# will save memory.
-our %EXPORT_TAGS = ( 'all' => [ qw(
-	
-) ] );
+# }}} 
 
-our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
-
-our @EXPORT = qw(
-	
-);
-
-our $VERSION = sprintf("%d.%02d", q$Revision: 1.10 $ =~ /(\d+)\.(\d+)/);
-
-my $NNTPSERVER = 'news';
-my $HEADERS = 'Date|From';	# Subject is always returned
-my $IRS = '';			# input record separator
-my $Limit= 200;
-my $verbose = 1;
+# ############################################################## &ss ###
+# ................................................ Subroutions start ...
 
 =head1 METHODS
 
-=head2 News::Search->new($newsgroups_array_ref, $criteria_hash_ref[, $limit])
+=head2 News::Search->new(\%config_param)
 
-  News::Search->new( ["cups.general", "cups.bugs"],
-    { subject => 'die|break|broke' } )
+Initialize the object.
 
-criteria_hash_ref takes a hash of params, as follows:
+  my $searcher = News::Search->new();
 
-=over 4
+or,
 
-=item *
+  my $searcher = News::Search->new( {} );
 
-subject=pattern, look in the Subject: line.
+which are the same as:
 
-=item *
+  my $searcher = News::Search->new( {
+     nntp_server => 'news',
+     msg_headers => 'Date|From',	# + Subject, which is always printed
+     msg_limit	 => 200,
+     verbose 	 => 0,
+     on_group    => \&default_group_handler,
+     on_message  => \&default_message_handler,
+  } );
 
-from=pattern, look for author in the From: line.
+What shown above are default settings. Any of the C<%config_param> attribute can be omitted when calling the new method.
 
-=item *
-
-body=pattern, look in article body.
-
-=back
-
-The above pattern match keyword can also be prefixed with 'no', e.g.,
-
-    nosubject=pattern
-
-to ignore messages if pattern found in the Subject: line.
+The C<new> is the only class method. All the rest methods are object methods.
 
 =cut
 
-sub new {
-    my ($class, $newsgroups, $criteria, $limit) = @_;
-    $Limit = $limit if $limit;
+News::Search->mk_accessors(qw(nntp_server msg_headers msg_limit verbose
+	on_group on_message nntp_handle newsgroups nntp_query));
 
-    my $NNTPSERVER = $ENV{"NNTPSERVER"} if $ENV{"NNTPSERVER"};
+my %config =
+    (
+     nntp_server => 'news',
+     msg_headers => 'Date|From',	# + Subject, which is always printed
+     msg_limit	 => 200,
+     verbose 	 => 0,
+     on_group    => \&default_group_handler,
+     on_message  => \&default_message_handler,
+ );
+
+my $verbose;
+
+sub new {
+    my ($class, $arg_ref) = @_;
+    my $self = $class->SUPER::new({%config, %$arg_ref});
+
+    $verbose = $self->verbose;
+
+    return $self;
+}
+
+=head2 Object attributes
+
+The following object attributes are accessible.
+
+=over 4
+
+=item * nntp_server([set_val])
+
+The nntp server to search.
+
+=item * msg_headers([set_val])
+
+Message headers to print.
+
+=item * msg_limit([set_val])
+
+Maximum number of posts to search (not return).
+
+=item * verbose([set_val])
+
+Be verbose.
+
+=item * on_group([set_val])
+
+Handler for group starts. Refer to L<news-search> for the example.
+
+=item * on_message([set_val])
+
+Handler for news message. Refer to L<news-search> for the example.
+
+=back
+
+Provide the C<set_val> to change the attribute, omitting it to retrieve the attribute value. E.g.,
+
+  $searcher->nntp_server("news.easysw.com");
+
+=head2 Object method: search_for($array_ref)
+
+  $searcher->search_for(\@ARGV);
+
+Command line parameter handling. Refer to L<news-search>
+section "command line arguments" for details.
+
+=cut
+
+sub search_for {
+    my ($self, $array_ref) = @_;
+
+    my $nntp_server;
+    $nntp_server = $self->nntp_server;
+    $nntp_server = $ENV{"NNTPSERVER"} if $ENV{"NNTPSERVER"};
 
     my $nntp;
     if (defined($ENV{DEBUG}) && $ENV{DEBUG} eq "1") {
-	$nntp = Net::NNTP->new($NNTPSERVER, Debug=>'On', Timeout=>10) ||
+	$nntp = Net::NNTP->new($nntp_server, Debug=>'On', Timeout=>10) ||
 	   croak  "Cant connect to News Server: $@";
     } else {
-	$nntp = Net::NNTP->new($NNTPSERVER) ||
+	$nntp = Net::NNTP->new($nntp_server) ||
 	    croak "Cant connect to News Server: $@";
     }
 
-    bless {
-	nntp_server	=> $NNTPSERVER,
-	nntp_handle	=> $nntp,
-	newsgroups	=> $newsgroups,
-	nntp_query	=> $criteria,
-	on_group	=> \&default_group_handler,
-	on_message	=> \&default_message_handler,
-    } => $class;
+    my @newsgroups;
+    my %args;
+
+    foreach (@$array_ref) {
+	if (/=/) {
+	    # key/value pair
+	    my ($name, $value) = split(/=/);
+	    $name = lc $name;
+	    $args{$name} = $value;
+	} else {
+	    # group name
+	    my $ngname = $_;
+	    if (index($ngname, "\*") > -1) {
+		# have wildcard (*) in group name.
+		my $nntplist = $nntp->list() || die "Cannot list newsgroups";
+		$ngname =~ s/\*/.*/g;
+		foreach (sort(keys(%$nntplist))) {
+		    if (/$ngname/) {
+			push(@newsgroups, $_);
+		    }
+		}
+	    } else {
+		push(@newsgroups, $ngname);
+	    }
+	}
+    }
+
+    print STDERR "Searching the top ". $self->msg_limit. " messages "
+	. " in newsgroups: @newsgroups...\n\n"
+	    if $verbose;
+
+    $self->nntp_handle($nntp);
+    $self->newsgroups(\@newsgroups);
+    $self->nntp_query(\%args);
 
 }
 
-# default handlers for group starts ...
+# default handler for group starts ...
 sub default_group_handler {
     my $newsgroup = shift;
     #print STDERR "\n\nSearching group '$newsgroup'\n\n";
 }
 
-# default handlers for news message ...
+# default handler for news message ...
 sub default_message_handler {
     print STDERR "." if $verbose;
 }
@@ -174,7 +256,7 @@ sub dbg_msg {
     warn "[News::Search] $show_msg\n";
 }
 
-=head2 SearchNewsgroups
+=head2 Object method: SearchNewsgroups()
 
 Search the given newsgroups with the given criteria:
 
@@ -184,6 +266,8 @@ Search the given newsgroups with the given criteria:
     # deal with  $article->{"SUBJECT"}, @{$article->{"HEADER"}})
     #  and $article->{"BODY"}
   }
+
+Refer to L<news-search> for usage example.
 
 =cut
 
@@ -203,11 +287,12 @@ sub SearchNewsgroups {
 	    next;
 	}
 
-	$first = $last - $Limit if $last - $Limit > $first;
+	$first = $last - $self->msg_limit if $last - $self->msg_limit > $first;
 	#warn "] $first => $last\n" if $verbose;
 	
 	# == news article loop
 	$self->{on_group}->($newsgroup);
+	my $msg_headers = $self->msg_headers;
 	for ($nntp->nntpstat($first);$nntp->next() || last;) {
 	    my $msghead = $nntp->head();
 
@@ -241,7 +326,7 @@ sub SearchNewsgroups {
 	    $newsarticles{"$msgfrom"} =
 	    {
 		"SUBJECT" => $msgsubj,
-		"HEADER" => [ grep(/^($HEADERS): /, @$msghead) ],
+		"HEADER" => [ grep(/^($msg_headers): /, @$msghead) ],
 		#"BODY" =>  $newsarticle,
 		"BODY" =>  $newsarticle
 		};
@@ -328,7 +413,11 @@ sub arrary_search($$){
     return $is_there;
 }
 
-1;
+# {{{ POD, Appendixes:
+
+=head1 SEE ALSO
+
+L<Net::NNTP>.
 
 =head1 BUGS
 
@@ -378,5 +467,7 @@ Copyright 2003-2008 Tong Sun, all rights reserved.
 This program is released under the BSD license.
 
 =cut
+
+# }}}
 
 1; # End of News::Search

@@ -2,14 +2,13 @@
 
 News::Search searches Usenet news postings.
 
-It can be used to search local news groups that google doesn't cover.
-Or, even for news groups that are covered by google, it can give you
-all the hits in one file, in the format that you prescribed.
+It can be used to search local news groups that google doesn't cover. Or,
+even for news groups that are covered by google, it can give you all the
+hits in one file, in the format that you prescribed.
 
-You can also adapt the included news-search command and put it into the cron
-job to watch for specific news groups for specific criteria and mail you
-reports according to the interval you set.
-
+You can also use the provided news-search in cron to watch specific news
+groups for specific criteria and mail you reports according to the interval
+you set.
 
 == INSTALLATION
 
@@ -19,6 +18,12 @@ To install this module, run the following commands:
 	make
 	make test
 	make install
+
+=== FILES
+
+link:release-log.txt[Release notes]. 
+
+link:Changes[Changes logs]. 
 
 == SUPPORT AND DOCUMENTATION
 

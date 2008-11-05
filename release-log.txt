@@ -1,9 +1,21 @@
-		  What's New in Release $Revision: 1.7 $
+		  What's New in Release $Revision: 1.8 $
 
 						$Author: tong $
 
 
 $Log: News-Search.news,v $
+Revision 1.8  2008/11/05 01:48:23  tong
+Release Module:News::Search revision:1.15 to the public.
+Changes since last release:
+
+- change the release directory structure
+- expose class attributes that can be tweaked
+- refactor the command line parameter handling from news-search into module,
+  simplified news-search.
+- wildcard (*) in group name now works.
+- introduce command line options to news-search to make it fully configurable.
+- dramatically enhanced the pod document.
+
 Revision 1.7  2008/11/01 15:04:40  tong
 - Amend the pod.
 
